@@ -21,6 +21,7 @@ object QueueFlusher {
         }
 
         Log.i(TAG, "Tentando reenviar ${pending.size} notificação(ões) pendente(s)")
+        AppLog.add(context, "Flush: ${pending.size} item(ns) pendente(s) na fila")
 
         var successCount = 0
         var failCount = 0
@@ -36,5 +37,6 @@ object QueueFlusher {
         }
 
         Log.i(TAG, "Flush concluído: $successCount enviada(s), $failCount ainda pendente(s)")
+        AppLog.add(context, "Flush concluído: $successCount enviada(s), $failCount ainda pendente(s)")
     }
 }

@@ -2,8 +2,11 @@ package com.nicolasdtb.finapplistener
 
 import android.content.Intent
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.provider.Settings
 import android.widget.CheckBox
+import android.widget.ScrollView
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 
@@ -17,6 +20,17 @@ class MainActivity : AppCompatActivity() {
     private lateinit var checkboxInter: CheckBox
     private lateinit var checkboxBradesco: CheckBox
     private lateinit var textStatus: TextView
+    private lateinit var textLog: TextView
+    private lateinit var scrollLog: ScrollView
+
+    private val logHandler = Handler(Looper.getMainLooper())
+    private val logRefreshInterval = 2000L
+    private val logRefreshRunnable = object : Runnable {
+        override fun run() {
+            refreshLog()
+            logHandler.postDelayed(this, logRefreshInterval)
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -26,6 +40,8 @@ class MainActivity : AppCompatActivity() {
         checkboxInter = findViewById(R.id.checkboxInter)
         checkboxBradesco = findViewById(R.id.checkboxBradesco)
         textStatus = findViewById(R.id.textStatus)
+        textLog = findViewById(R.id.textLog)
+        scrollLog = findViewById(R.id.scrollLog)
 
         loadState()
 
@@ -42,10 +58,32 @@ class MainActivity : AppCompatActivity() {
         findViewById<android.widget.Button>(R.id.buttonEnableListener).setOnClickListener {
             startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
         }
+
+        findViewById<android.widget.Button>(R.id.buttonClearLog).setOnClickListener {
+            AppLog.clear(this)
+            refreshLog()
+        }
     }
 
     override fun onResume() {
         super.onResume()
+        updateStatus()
+        logHandler.post(logRefreshRunnable)
+    }
+
+    override fun onPause() {
+        super.onPause()
+        logHandler.removeCallbacks(logRefreshRunnable)
+    }
+
+    private fun refreshLog() {
+        val logText = AppLog.readAll(this)
+        // Só atualiza (e rola pro fim) se o conteúdo mudou, para não
+        // atrapalhar se o usuário estiver com o dedo rolando o scroll.
+        if (textLog.text.toString() != logText) {
+            textLog.text = logText
+            scrollLog.post { scrollLog.fullScroll(android.view.View.FOCUS_DOWN) }
+        }
         updateStatus()
     }
 

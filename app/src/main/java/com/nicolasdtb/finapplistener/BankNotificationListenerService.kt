@@ -31,6 +31,8 @@ class BankNotificationListenerService : NotificationListenerService() {
             return
         }
 
+        AppLog.add(applicationContext, "Notificação recebida de $appName")
+
         val webhookUrl = AppConfig.webhookUrl(applicationContext)
 
         // Envia em background para não bloquear o listener do sistema.
@@ -40,9 +42,13 @@ class BankNotificationListenerService : NotificationListenerService() {
             // quando a rede volta a funcionar.
             QueueFlusher.flush(applicationContext)
 
+            AppLog.add(applicationContext, "Enviando notificação de $appName para o FinApp...")
             val success = WebhookSender.send(webhookUrl, appName, title, text)
-            if (!success) {
+            if (success) {
+                AppLog.add(applicationContext, "Enviado com sucesso: $appName")
+            } else {
                 Log.w("FinAppListener", "Falha ao enviar notificação de $appName — guardando na fila")
+                AppLog.add(applicationContext, "Falha ao enviar $appName — guardado na fila local")
                 PendingQueue.enqueue(applicationContext, appName, title, text)
             }
         }
@@ -51,6 +57,7 @@ class BankNotificationListenerService : NotificationListenerService() {
     override fun onListenerConnected() {
         super.onListenerConnected()
         Log.i("FinAppListener", "Listener de notificações conectado")
+        AppLog.add(applicationContext, "Serviço de notificações conectado")
 
         // Tenta drenar a fila assim que o serviço sobe (ex: reboot do celular).
         executor.execute { QueueFlusher.flush(applicationContext) }
@@ -60,6 +67,7 @@ class BankNotificationListenerService : NotificationListenerService() {
 
     override fun onListenerDisconnected() {
         super.onListenerDisconnected()
+        AppLog.add(applicationContext, "Serviço de notificações desconectado")
         unregisterNetworkCallback()
     }
 
@@ -73,6 +81,12 @@ class BankNotificationListenerService : NotificationListenerService() {
      * changed" que era usado no fluxo do Automate) e tenta reenviar o que
      * estiver pendente sempre que uma rede com internet ficar disponível —
      * inclui o momento em que a VPN ZeroTier conecta.
+     *
+     * IMPORTANTE: por padrão, um NetworkRequest exclui redes VPN da busca
+     * (via a capability NET_CAPABILITY_NOT_VPN, incluída implicitamente).
+     * Como o cenário principal aqui é justamente detectar quando a VPN
+     * conecta, é necessário remover essa capability explicitamente — do
+     * contrário o callback nunca dispara para a interface do ZeroTier.
      */
     private fun registerNetworkCallback() {
         val connectivityManager =
@@ -80,17 +94,27 @@ class BankNotificationListenerService : NotificationListenerService() {
 
         val request = NetworkRequest.Builder()
             .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+            .removeCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)
             .build()
 
         val callback = object : ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: Network) {
-                if (!PendingQueue.hasPending(applicationContext)) return
+                AppLog.add(applicationContext, "Rede disponível (possível VPN conectando)")
+                if (!PendingQueue.hasPending(applicationContext)) {
+                    AppLog.add(applicationContext, "Nenhuma notificação pendente — nada a reenviar")
+                    return
+                }
                 Log.i("FinAppListener", "Rede disponível — tentando reenviar fila pendente")
                 executor.execute {
                     // Pequena espera para dar tempo da rota da VPN estabilizar de fato.
                     Thread.sleep(2000)
+                    AppLog.add(applicationContext, "Tentando reenviar fila pendente...")
                     QueueFlusher.flush(applicationContext)
                 }
+            }
+
+            override fun onLost(network: Network) {
+                AppLog.add(applicationContext, "Rede perdida")
             }
         }
 
