@@ -62,11 +62,19 @@ class MainActivity : AppCompatActivity() {
         ).orEmpty()
 
         val granted = enabledListeners.contains(packageName)
-        textStatus.text = if (granted) {
+        val accessLine = if (granted) {
             "Acesso a notificações concedido — o listener está ativo em segundo plano."
         } else {
             "Acesso a notificações NÃO concedido. Toque no botão acima e habilite " +
                 "\"FinApp Listener\" na lista."
         }
+
+        val queueLine = if (PendingQueue.hasPending(this)) {
+            "\n\nHá notificações aguardando reenvio (sem conexão com o FinApp no momento)."
+        } else {
+            "\n\nNenhuma notificação pendente na fila."
+        }
+
+        textStatus.text = accessLine + queueLine
     }
 }

@@ -51,11 +51,22 @@ que grava um valor customizado via `AppConfig.setAppEnabled`-style em
 SharedPreferences (o método `AppConfig.webhookUrl()` já está preparado para ler
 um valor salvo, se algum dia for adicionado um campo de edição na UI).
 
+## Fallback de conectividade (fila local)
+
+Se o POST falhar (ex: celular fora da VPN no momento da notificação), a
+notificação é gravada em um arquivo local (`pending_notifications.jsonl`,
+dentro da pasta privada do app). O serviço fica de olho em mudanças de rede
+(equivalente ao trigger "Network state changed" do Automate) e, assim que uma
+rede com internet fica disponível, tenta reenviar tudo que estiver pendente —
+com uma pequena espera de 2s para dar tempo da rota da VPN se estabilizar.
+
+Itens que falharem de novo no reenvio voltam para a fila, sem serem perdidos.
+A tela principal mostra se há algo pendente no momento.
+
 ## Limitações da v1
 
-- Sem fila local de retry: se o POST falhar (ex: fora da VPN), a notificação
-  é perdida — não há fallback como o `nubank_queue.jsonl` do fluxo do Automate.
-  Pode ser adicionado depois (gravar em arquivo local + um `WorkManager`
-  periódico para tentar reenviar, similar à lógica já usada no Automate).
 - Apps monitorados são fixos no código (3 bancos). Para adicionar um app novo,
   edite `AppConfig.MONITORED_APPS` e o layout/MainActivity, e recompile.
+- A fila local não tem limite de tamanho nem expiração — em uso normal isso
+  não deve ser um problema (poucas notificações por dia), mas vale saber que
+  ela cresce indefinidamente se o app ficar muito tempo sem conseguir enviar.

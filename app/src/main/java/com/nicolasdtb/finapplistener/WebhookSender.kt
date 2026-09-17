@@ -42,7 +42,14 @@ object WebhookSender {
             put("title", title)
             put("text", text)
         }
+        return sendRaw(webhookUrl, payload.toString(), appName)
+    }
 
+    /**
+     * Envia um payload JSON já pronto (usado ao reenviar itens vindos da
+     * fila local em [PendingQueue]).
+     */
+    fun sendRaw(webhookUrl: String, jsonPayload: String, labelForLog: String = "item da fila"): Boolean {
         return try {
             val url = URL(webhookUrl)
             val connection = (url.openConnection() as HttpURLConnection)
@@ -63,7 +70,7 @@ object WebhookSender {
             }
 
             OutputStreamWriter(connection.outputStream, Charsets.UTF_8).use { writer ->
-                writer.write(payload.toString())
+                writer.write(jsonPayload)
                 writer.flush()
             }
 
@@ -72,11 +79,11 @@ object WebhookSender {
 
             val success = responseCode in 200..299
             if (!success) {
-                Log.w(TAG, "Webhook respondeu com status $responseCode para $appName")
+                Log.w(TAG, "Webhook respondeu com status $responseCode para $labelForLog")
             }
             success
         } catch (e: Exception) {
-            Log.e(TAG, "Falha ao enviar notificação de $appName para o webhook", e)
+            Log.e(TAG, "Falha ao enviar $labelForLog para o webhook", e)
             false
         }
     }
