@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="24dp">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="FinApp Listener"
+        android:textSize="22sp"
+        android:textStyle="bold"
+        android:layout_marginBottom="4dp" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Selecione quais apps monitorar e ative o acesso a notificações."
+        android:textSize="14sp"
+        android:layout_marginBottom="24dp" />
+
+    <CheckBox
+        android:id="@+id/checkboxNubank"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Nubank"
+        android:textSize="16sp"
+        android:layout_marginBottom="8dp" />
+
+    <CheckBox
+        android:id="@+id/checkboxInter"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Banco Inter"
+        android:textSize="16sp"
+        android:layout_marginBottom="8dp" />
+
+    <CheckBox
+        android:id="@+id/checkboxBradesco"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Bradesco"
+        android:textSize="16sp"
+        android:layout_marginBottom="24dp" />
+
+    <Button
+        android:id="@+id/buttonEnableListener"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Ativar acesso a notificações" />
+
+    <TextView
+        android:id="@+id/textStatus"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="24dp"
+        android:textSize="13sp" />
+
+</LinearLayout>
