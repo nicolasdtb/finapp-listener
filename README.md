@@ -51,6 +51,29 @@ que grava um valor customizado via `AppConfig.setAppEnabled`-style em
 SharedPreferences (o método `AppConfig.webhookUrl()` já está preparado para ler
 um valor salvo, se algum dia for adicionado um campo de edição na UI).
 
+## Resistência a ser encerrado pelo sistema (importante em Samsung/Xiaomi/etc)
+
+O serviço agora roda como **foreground service**, com uma notificação
+persistente e silenciosa ("FinApp Listener ativo"). Isso aumenta bastante a
+prioridade do processo perante o gerenciador de memória do Android, mas
+**não elimina totalmente** o risco de o sistema encerrá-lo — fabricantes como
+Samsung têm camadas próprias de gerenciamento de bateria bem agressivas.
+
+Para reduzir ainda mais o risco de o serviço parar silenciosamente:
+
+1. **Configurações → Apps → FinApp Listener → Bateria** → mude para
+   **"Sem restrições"**
+2. **Configurações → Cuidados com o dispositivo → Bateria** → desative
+   *"Colocar apps não usados em repouso"* para o FinApp Listener (ou
+   adicione-o à lista de apps que nunca hibernam)
+3. Na lista de **apps recentes**, toque no ícone de cadeado no card do
+   FinApp Listener para impedir que ele seja descartado da memória
+
+Se a notificação "FinApp Listener ativo" nunca aparecer, confira se a
+permissão de notificações foi concedida (o app pede isso na primeira
+abertura, a partir do Android 13) — sem ela a notificação simplesmente não
+é exibida, embora o serviço ainda tente rodar.
+
 ## Fallback de conectividade (fila local)
 
 Se o POST falhar (ex: celular fora da VPN no momento da notificação), a

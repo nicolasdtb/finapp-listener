@@ -1,6 +1,9 @@
 package com.nicolasdtb.finapplistener
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -9,6 +12,8 @@ import android.widget.CheckBox
 import android.widget.ScrollView
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 
 class MainActivity : AppCompatActivity() {
 
@@ -44,6 +49,7 @@ class MainActivity : AppCompatActivity() {
         scrollLog = findViewById(R.id.scrollLog)
 
         loadState()
+        requestNotificationPermissionIfNeeded()
 
         checkboxNubank.setOnCheckedChangeListener { _, checked ->
             AppConfig.setAppEnabled(this, nubankPackage, checked)
@@ -62,6 +68,30 @@ class MainActivity : AppCompatActivity() {
         findViewById<android.widget.Button>(R.id.buttonClearLog).setOnClickListener {
             AppLog.clear(this)
             refreshLog()
+        }
+    }
+
+    /**
+     * A partir do Android 13 (API 33), mostrar QUALQUER notificação — incluindo
+     * a notificação persistente do foreground service que mantém o listener
+     * mais resistente a ser encerrado pelo sistema — exige essa permissão em
+     * tempo de execução. Sem ela, o serviço ainda roda, mas o Android pode
+     * voltar a tratá-lo como processo comum em segundo plano.
+     */
+    private fun requestNotificationPermissionIfNeeded() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+
+        val granted = ContextCompat.checkSelfPermission(
+            this,
+            Manifest.permission.POST_NOTIFICATIONS
+        ) == PackageManager.PERMISSION_GRANTED
+
+        if (!granted) {
+            ActivityCompat.requestPermissions(
+                this,
+                arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+                1001
+            )
         }
     }
 

@@ -1,18 +1,27 @@
 package com.nicolasdtb.finapplistener
 
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
+import android.os.Build
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import android.util.Log
+import androidx.core.app.NotificationCompat
 import java.util.concurrent.Executors
 
 class BankNotificationListenerService : NotificationListenerService() {
 
     private val executor = Executors.newSingleThreadExecutor()
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
+
+    companion object {
+        private const val FOREGROUND_CHANNEL_ID = "finapp_listener_status"
+        private const val FOREGROUND_NOTIFICATION_ID = 1
+    }
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
         val packageName = sbn.packageName
@@ -59,6 +68,8 @@ class BankNotificationListenerService : NotificationListenerService() {
         Log.i("FinAppListener", "Listener de notificações conectado")
         AppLog.add(applicationContext, "Serviço de notificações conectado")
 
+        startForegroundWithStatusNotification()
+
         // Tenta drenar a fila assim que o serviço sobe (ex: reboot do celular).
         executor.execute { QueueFlusher.flush(applicationContext) }
 
@@ -74,6 +85,56 @@ class BankNotificationListenerService : NotificationListenerService() {
     override fun onDestroy() {
         super.onDestroy()
         unregisterNetworkCallback()
+    }
+
+    /**
+     * Eleva o serviço a "foreground service", com uma notificação
+     * persistente e silenciosa. Isso muda drasticamente a prioridade do
+     * processo perante o gerenciador de memória/energia do Android — sem
+     * isso, fabricantes com política agressiva de bateria (ex: Samsung,
+     * Xiaomi) podem matar o processo em segundo plano mesmo com a
+     * permissão de acesso a notificações concedida, fazendo o listener
+     * parar de funcionar silenciosamente até o app ser reaberto.
+     */
+    private fun startForegroundWithStatusNotification() {
+        val notificationManager = getSystemService(NotificationManager::class.java)
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                FOREGROUND_CHANNEL_ID,
+                "Status do FinApp Listener",
+                NotificationManager.IMPORTANCE_MIN
+            ).apply {
+                description = "Indica que o monitoramento de notificações bancárias está ativo"
+                setShowBadge(false)
+            }
+            notificationManager?.createNotificationChannel(channel)
+        }
+
+        val notification = NotificationCompat.Builder(this, FOREGROUND_CHANNEL_ID)
+            .setContentTitle("FinApp Listener ativo")
+            .setContentText("Monitorando notificações bancárias")
+            .setSmallIcon(android.R.drawable.stat_notify_sync)
+            .setPriority(NotificationCompat.PRIORITY_MIN)
+            .setOngoing(true)
+            .setSilent(true)
+            .build()
+
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(
+                    FOREGROUND_NOTIFICATION_ID,
+                    notification,
+                    android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
+                )
+            } else {
+                startForeground(FOREGROUND_NOTIFICATION_ID, notification)
+            }
+            AppLog.add(applicationContext, "Foreground service ativado (maior resistência a ser encerrado)")
+        } catch (e: Exception) {
+            Log.e("FinAppListener", "Falha ao iniciar foreground service", e)
+            AppLog.add(applicationContext, "Falha ao ativar foreground service: ${e.message}")
+        }
     }
 
     /**
