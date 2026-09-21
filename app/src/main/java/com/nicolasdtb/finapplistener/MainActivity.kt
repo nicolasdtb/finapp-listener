@@ -65,10 +65,30 @@ class MainActivity : AppCompatActivity() {
             startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
         }
 
+        findViewById<android.widget.Button>(R.id.buttonForceFlush).setOnClickListener {
+            forceFlushQueue()
+        }
+
         findViewById<android.widget.Button>(R.id.buttonClearLog).setOnClickListener {
             AppLog.clear(this)
             refreshLog()
         }
+    }
+
+    private fun forceFlushQueue() {
+        if (!PendingQueue.hasPending(this)) {
+            AppLog.add(this, "Reenvio manual: nenhuma notificação pendente")
+            refreshLog()
+            return
+        }
+
+        AppLog.add(this, "Reenvio manual solicitado pelo usuário")
+        refreshLog()
+
+        Thread {
+            QueueFlusher.flush(applicationContext)
+            runOnUiThread { refreshLog() }
+        }.start()
     }
 
     /**
