@@ -21,6 +21,20 @@ class BankNotificationListenerService : NotificationListenerService() {
     companion object {
         private const val FOREGROUND_CHANNEL_ID = "finapp_listener_status"
         private const val FOREGROUND_NOTIFICATION_ID = 1
+
+        // Algumas apps de banco repostam a mesma notificacao. Texto identico dentro
+        // dessa janela e ignorado.
+        private const val DUPLICATE_WINDOW_MS = 15_000L
+        private val recentNotifications = HashMap<String, Long>()
+
+        @Synchronized
+        private fun isRecentDuplicate(key: String): Boolean {
+            val now = System.currentTimeMillis()
+            recentNotifications.entries.removeAll { now - it.value > DUPLICATE_WINDOW_MS }
+            if (recentNotifications.containsKey(key)) return true
+            recentNotifications[key] = now
+            return false
+        }
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
@@ -40,6 +54,11 @@ class BankNotificationListenerService : NotificationListenerService() {
             return
         }
 
+        if (isRecentDuplicate("$packageName|$title|$text")) {
+            AppLog.add(applicationContext, "Notificação repetida de $appName ignorada")
+            return
+        }
+
         AppLog.add(applicationContext, "Notificação recebida de $appName")
 
         val webhookUrl = AppConfig.webhookUrl(applicationContext)
@@ -53,13 +72,21 @@ class BankNotificationListenerService : NotificationListenerService() {
             QueueFlusher.flush(applicationContext)
 
             AppLog.add(applicationContext, "Enviando notificação de $appName para o FinApp...")
-            val success = WebhookSender.send(webhookUrl, webhookToken, appName, title, text)
-            if (success) {
-                AppLog.add(applicationContext, "Enviado com sucesso: $appName")
-            } else {
-                Log.w("FinAppListener", "Falha ao enviar notificação de $appName — guardando na fila")
-                AppLog.add(applicationContext, "Falha ao enviar $appName — guardado na fila local")
-                PendingQueue.enqueue(applicationContext, appName, title, text)
+            val result = WebhookSender.send(webhookUrl, webhookToken, appName, title, text)
+            when (result.outcome) {
+                Outcome.SUCCESS -> AppLog.add(applicationContext, "Enviado com sucesso: $appName")
+                Outcome.DROP -> {
+                    // Servidor recusou de forma definitiva (ex: nao achou valor): nao adianta reenviar.
+                    AppLog.add(applicationContext, "Servidor recusou a notificação de $appName (HTTP ${result.code}) — descartada")
+                }
+                Outcome.RETRY -> {
+                    Log.w("FinAppListener", "Falha ao enviar notificação de $appName — guardando na fila")
+                    if (result.code == 401) {
+                        AppLog.add(applicationContext, "Servidor recusou o token (HTTP 401) — confira o token no app")
+                    }
+                    AppLog.add(applicationContext, "Falha ao enviar $appName — guardado na fila local")
+                    PendingQueue.enqueue(applicationContext, appName, title, text)
+                }
             }
         }
     }

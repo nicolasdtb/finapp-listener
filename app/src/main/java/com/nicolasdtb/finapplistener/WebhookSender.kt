@@ -23,6 +23,18 @@ import java.security.cert.X509Certificate
  * desabilitamos a validação de certificado/hostname especificamente
  * para essa conexão, em vez de embutir a CA do mkcert no app.
  */
+/** O que fazer com uma notificacao depois de tentar enviar. */
+enum class Outcome {
+    /** Servidor aceitou (2xx). */
+    SUCCESS,
+    /** Falha temporaria (rede, 5xx, 401 token errado...): manter na fila e tentar depois. */
+    RETRY,
+    /** Servidor recusou de forma definitiva (ex: 400): reenviar nao adianta, descartar. */
+    DROP
+}
+
+data class SendResult(val outcome: Outcome, val code: Int? = null)
+
 object WebhookSender {
 
     private const val TAG = "FinAppListener"
@@ -36,7 +48,7 @@ object WebhookSender {
 
     private val trustAllHostnames = HostnameVerifier { _, _ -> true }
 
-    fun send(webhookUrl: String, token: String, appName: String, title: String, text: String): Boolean {
+    fun send(webhookUrl: String, token: String, appName: String, title: String, text: String): SendResult {
         val payload = JSONObject().apply {
             put("app_name", appName)
             put("title", title)
@@ -46,10 +58,22 @@ object WebhookSender {
     }
 
     /**
+     * 2xx = enviado. 401/403/408/429, 5xx e falhas de rede = tentar de novo depois
+     * (401 inclui token errado: o item fica guardado ate o token ser corrigido).
+     * Demais 4xx (ex: 400 "nao consegui extrair valor") = definitivo, nao volta para a fila.
+     */
+    private fun classify(code: Int): Outcome = when {
+        code in 200..299 -> Outcome.SUCCESS
+        code in listOf(401, 403, 408, 429) -> Outcome.RETRY
+        code in 400..499 -> Outcome.DROP
+        else -> Outcome.RETRY
+    }
+
+    /**
      * Envia um payload JSON já pronto (usado ao reenviar itens vindos da
      * fila local em [PendingQueue]).
      */
-    fun sendRaw(webhookUrl: String, token: String, jsonPayload: String, labelForLog: String = "item da fila"): Boolean {
+    fun sendRaw(webhookUrl: String, token: String, jsonPayload: String, labelForLog: String = "item da fila"): SendResult {
         return try {
             val url = URL(webhookUrl)
             val connection = (url.openConnection() as HttpURLConnection)
@@ -80,14 +104,14 @@ object WebhookSender {
             val responseCode = connection.responseCode
             connection.disconnect()
 
-            val success = responseCode in 200..299
-            if (!success) {
+            val outcome = classify(responseCode)
+            if (outcome != Outcome.SUCCESS) {
                 Log.w(TAG, "Webhook respondeu com status $responseCode para $labelForLog")
             }
-            success
+            SendResult(outcome, responseCode)
         } catch (e: Exception) {
             Log.e(TAG, "Falha ao enviar $labelForLog para o webhook", e)
-            false
+            SendResult(Outcome.RETRY)
         }
     }
 }
