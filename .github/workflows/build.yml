@@ -28,7 +28,20 @@ jobs:
         with:
           gradle-version: '8.7'
 
+      - name: Preparar chave de assinatura
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/finapp.keystore"
+            echo "KEYSTORE_PATH=$RUNNER_TEMP/finapp.keystore" >> "$GITHUB_ENV"
+          else
+            echo "Segredo KEYSTORE_BASE64 ausente: usando a chave debug padrao."
+          fi
+
       - name: Build debug APK
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
         run: gradle assembleDebug
 
       - name: Upload APK

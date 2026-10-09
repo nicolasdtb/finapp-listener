@@ -15,7 +15,27 @@ android {
         versionName = "1.0"
     }
 
+    // Chave de assinatura fixa (vem dos segredos do GitHub no build do CI).
+    // Sem ela, cada build gera uma assinatura nova e o Android recusa a atualizacao.
+    // Localmente, sem as variaveis, cai na chave debug padrao.
+    val ciKeystorePath: String? = System.getenv("KEYSTORE_PATH")
+    signingConfigs {
+        if (ciKeystorePath != null) {
+            create("ci") {
+                storeFile = file(ciKeystorePath)
+                storePassword = System.getenv("KEYSTORE_PASSWORD")
+                keyAlias = "finapp"
+                keyPassword = System.getenv("KEYSTORE_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
+        debug {
+            if (ciKeystorePath != null) {
+                signingConfig = signingConfigs.getByName("ci")
+            }
+        }
         release {
             isMinifyEnabled = false
         }
