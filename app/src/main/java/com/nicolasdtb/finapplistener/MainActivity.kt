@@ -8,7 +8,10 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
+import android.text.Editable
+import android.text.TextWatcher
 import android.widget.CheckBox
+import android.widget.EditText
 import android.widget.ScrollView
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
@@ -24,6 +27,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var checkboxNubank: CheckBox
     private lateinit var checkboxInter: CheckBox
     private lateinit var checkboxBradesco: CheckBox
+    private lateinit var editWebhookToken: EditText
     private lateinit var textStatus: TextView
     private lateinit var textLog: TextView
     private lateinit var scrollLog: ScrollView
@@ -44,12 +48,22 @@ class MainActivity : AppCompatActivity() {
         checkboxNubank = findViewById(R.id.checkboxNubank)
         checkboxInter = findViewById(R.id.checkboxInter)
         checkboxBradesco = findViewById(R.id.checkboxBradesco)
+        editWebhookToken = findViewById(R.id.editWebhookToken)
         textStatus = findViewById(R.id.textStatus)
         textLog = findViewById(R.id.textLog)
         scrollLog = findViewById(R.id.scrollLog)
 
         loadState()
         requestNotificationPermissionIfNeeded()
+
+        // Salva o token automaticamente conforme e digitado/colado.
+        editWebhookToken.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: Editable?) {
+                AppConfig.setWebhookToken(this@MainActivity, s?.toString().orEmpty())
+            }
+        })
 
         checkboxNubank.setOnCheckedChangeListener { _, checked ->
             AppConfig.setAppEnabled(this, nubankPackage, checked)
@@ -141,6 +155,7 @@ class MainActivity : AppCompatActivity() {
         checkboxNubank.isChecked = AppConfig.isAppEnabled(this, nubankPackage)
         checkboxInter.isChecked = AppConfig.isAppEnabled(this, interPackage)
         checkboxBradesco.isChecked = AppConfig.isAppEnabled(this, bradescoPackage)
+        editWebhookToken.setText(AppConfig.webhookToken(this))
     }
 
     private fun updateStatus() {

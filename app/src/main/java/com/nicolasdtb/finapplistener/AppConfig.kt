@@ -14,6 +14,7 @@ object AppConfig {
 
     private const val PREFS_NAME = "finapp_listener_prefs"
     private const val PREFS_WEBHOOK_URL = "webhook_url"
+    private const val PREFS_WEBHOOK_TOKEN = "webhook_token"
 
     // Mesma URL usada hoje no fluxo do Automate.
     const val WEBHOOK_URL_DEFAULT = "https://172.23.17.157/api/v1/webhooks/bank-notification"
@@ -28,6 +29,17 @@ object AppConfig {
     fun webhookUrl(context: Context): String {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         return prefs.getString(PREFS_WEBHOOK_URL, WEBHOOK_URL_DEFAULT) ?: WEBHOOK_URL_DEFAULT
+    }
+
+    /** Token do webhook (WEBHOOK_TOKEN do servidor). Fica so no aparelho, nunca no codigo. */
+    fun webhookToken(context: Context): String {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        return prefs.getString(PREFS_WEBHOOK_TOKEN, "") ?: ""
+    }
+
+    fun setWebhookToken(context: Context, token: String) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit().putString(PREFS_WEBHOOK_TOKEN, token.trim()).apply()
     }
 
     fun isAppEnabled(context: Context, packageName: String): Boolean {

@@ -18,7 +18,23 @@
         android:layout_height="wrap_content"
         android:text="Selecione quais apps monitorar e ative o acesso a notificações."
         android:textSize="14sp"
-        android:layout_marginBottom="24dp" />
+        android:layout_marginBottom="16dp" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Token do webhook (copie do .env do servidor)"
+        android:textSize="13sp" />
+
+    <EditText
+        android:id="@+id/editWebhookToken"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Cole aqui o WEBHOOK_TOKEN"
+        android:inputType="textNoSuggestions"
+        android:singleLine="true"
+        android:textSize="13sp"
+        android:layout_marginBottom="16dp" />
 
     <CheckBox
         android:id="@+id/checkboxNubank"

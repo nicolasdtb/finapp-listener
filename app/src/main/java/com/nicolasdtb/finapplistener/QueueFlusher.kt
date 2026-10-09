@@ -14,6 +14,7 @@ object QueueFlusher {
     @Synchronized
     fun flush(context: Context) {
         val webhookUrl = AppConfig.webhookUrl(context)
+        val webhookToken = AppConfig.webhookToken(context)
         val pending = PendingQueue.drain(context)
 
         if (pending.isEmpty()) {
@@ -27,7 +28,7 @@ object QueueFlusher {
         var failCount = 0
 
         for (jsonLine in pending) {
-            val success = WebhookSender.sendRaw(webhookUrl, jsonLine, "item da fila")
+            val success = WebhookSender.sendRaw(webhookUrl, webhookToken, jsonLine, "item da fila")
             if (success) {
                 successCount++
             } else {

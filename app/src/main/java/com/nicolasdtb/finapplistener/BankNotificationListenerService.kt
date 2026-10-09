@@ -43,6 +43,7 @@ class BankNotificationListenerService : NotificationListenerService() {
         AppLog.add(applicationContext, "Notificação recebida de $appName")
 
         val webhookUrl = AppConfig.webhookUrl(applicationContext)
+        val webhookToken = AppConfig.webhookToken(applicationContext)
 
         // Envia em background para não bloquear o listener do sistema.
         executor.execute {
@@ -52,7 +53,7 @@ class BankNotificationListenerService : NotificationListenerService() {
             QueueFlusher.flush(applicationContext)
 
             AppLog.add(applicationContext, "Enviando notificação de $appName para o FinApp...")
-            val success = WebhookSender.send(webhookUrl, appName, title, text)
+            val success = WebhookSender.send(webhookUrl, webhookToken, appName, title, text)
             if (success) {
                 AppLog.add(applicationContext, "Enviado com sucesso: $appName")
             } else {

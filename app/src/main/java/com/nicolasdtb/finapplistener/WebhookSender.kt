@@ -36,20 +36,20 @@ object WebhookSender {
 
     private val trustAllHostnames = HostnameVerifier { _, _ -> true }
 
-    fun send(webhookUrl: String, appName: String, title: String, text: String): Boolean {
+    fun send(webhookUrl: String, token: String, appName: String, title: String, text: String): Boolean {
         val payload = JSONObject().apply {
             put("app_name", appName)
             put("title", title)
             put("text", text)
         }
-        return sendRaw(webhookUrl, payload.toString(), appName)
+        return sendRaw(webhookUrl, token, payload.toString(), appName)
     }
 
     /**
      * Envia um payload JSON já pronto (usado ao reenviar itens vindos da
      * fila local em [PendingQueue]).
      */
-    fun sendRaw(webhookUrl: String, jsonPayload: String, labelForLog: String = "item da fila"): Boolean {
+    fun sendRaw(webhookUrl: String, token: String, jsonPayload: String, labelForLog: String = "item da fila"): Boolean {
         return try {
             val url = URL(webhookUrl)
             val connection = (url.openConnection() as HttpURLConnection)
@@ -64,6 +64,9 @@ object WebhookSender {
             connection.apply {
                 requestMethod = "POST"
                 setRequestProperty("Content-Type", "application/json; charset=utf-8")
+                if (token.isNotBlank()) {
+                    setRequestProperty("Authorization", "Bearer ${token.trim()}")
+                }
                 connectTimeout = TIMEOUT_MS
                 readTimeout = TIMEOUT_MS
                 doOutput = true
