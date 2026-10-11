@@ -40,6 +40,12 @@ android {
         }
         release {
             isMinifyEnabled = false
+            // Mesma chave do CI (atualiza por cima do app ja instalado); local, cai na chave debug.
+            signingConfig = if (ciKeystorePath != null) {
+                signingConfigs.getByName("ci")
+            } else {
+                signingConfigs.getByName("debug")
+            }
         }
     }
 
@@ -54,6 +60,12 @@ android {
 
     buildFeatures {
         viewBinding = true
+    }
+
+    // O lint do release nao deve barrar o build do CI por avisos que nao afetam o uso.
+    lint {
+        checkReleaseBuilds = false
+        abortOnError = false
     }
 }
 

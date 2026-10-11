@@ -42,23 +42,23 @@ jobs:
             echo "Segredo KEYSTORE_BASE64 ausente: usando a chave debug padrao."
           fi
 
-      - name: Build debug APK
+      - name: Build release APK
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-        run: gradle assembleDebug
+        run: gradle assembleRelease
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: finapp-listener-debug
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: finapp-listener
+          path: app/build/outputs/apk/release/app-release.apk
 
       - name: Publicar release (o app consulta isto para se atualizar)
         if: github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          cp app/build/outputs/apk/debug/app-debug.apk finapp-listener.apk
+          cp app/build/outputs/apk/release/app-release.apk finapp-listener.apk
           gh release create "v${{ github.run_number }}" finapp-listener.apk \
             --title "FinApp Listener 1.${{ github.run_number }}" \
             --notes "Build automatico #${{ github.run_number }}" \
