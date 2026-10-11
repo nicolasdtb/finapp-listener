@@ -11,8 +11,10 @@ android {
         applicationId = "com.nicolasdtb.finapplistener"
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0"
+        // No CI, o numero da execucao vira a versao (sempre crescente); local = 1.
+        val runNumber = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 1
+        versionCode = runNumber
+        versionName = "1.$runNumber"
     }
 
     // Chave de assinatura fixa (vem dos segredos do GitHub no build do CI).

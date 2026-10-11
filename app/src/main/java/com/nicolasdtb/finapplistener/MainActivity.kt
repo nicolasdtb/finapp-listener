@@ -10,6 +10,8 @@ import android.os.Looper
 import android.provider.Settings
 import android.text.Editable
 import android.text.TextWatcher
+import android.view.View
+import android.widget.Button
 import android.widget.CheckBox
 import android.widget.EditText
 import android.widget.ScrollView
@@ -31,6 +33,11 @@ class MainActivity : AppCompatActivity() {
     private lateinit var textStatus: TextView
     private lateinit var textLog: TextView
     private lateinit var scrollLog: ScrollView
+    private lateinit var updateBanner: View
+    private lateinit var textUpdate: TextView
+    private lateinit var buttonUpdate: Button
+    private var pendingUpdate: UpdateInfo? = null
+    private var lastUpdateCheck = 0L
 
     private val logHandler = Handler(Looper.getMainLooper())
     private val logRefreshInterval = 2000L
@@ -52,6 +59,12 @@ class MainActivity : AppCompatActivity() {
         textStatus = findViewById(R.id.textStatus)
         textLog = findViewById(R.id.textLog)
         scrollLog = findViewById(R.id.scrollLog)
+        updateBanner = findViewById(R.id.updateBanner)
+        textUpdate = findViewById(R.id.textUpdate)
+        buttonUpdate = findViewById(R.id.buttonUpdate)
+        findViewById<TextView>(R.id.textVersion).text =
+            "Versão ${Updater.installedVersionName(this)}"
+        buttonUpdate.setOnClickListener { downloadAndInstall() }
 
         loadState()
         requestNotificationPermissionIfNeeded()
@@ -129,8 +142,50 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    /** Consulta o GitHub (no maximo a cada 10 min) e mostra o aviso se houver versao nova. */
+    private fun checkForUpdate() {
+        val now = System.currentTimeMillis()
+        if (now - lastUpdateCheck < 10 * 60 * 1000) return
+        lastUpdateCheck = now
+        Thread {
+            val info = Updater.checkForUpdate(applicationContext)
+            runOnUiThread {
+                pendingUpdate = info
+                if (info != null) {
+                    textUpdate.text = "Nova versão disponível: ${info.versionName}"
+                    updateBanner.visibility = View.VISIBLE
+                } else {
+                    updateBanner.visibility = View.GONE
+                }
+            }
+        }.start()
+    }
+
+    private fun downloadAndInstall() {
+        val info = pendingUpdate ?: return
+        if (!Updater.ensureInstallPermission(this)) {
+            textUpdate.text = "Libere \"Instalar apps desconhecidos\" para o FinApp Listener e toque de novo."
+            return
+        }
+        buttonUpdate.isEnabled = false
+        textUpdate.text = "Baixando ${info.versionName}…"
+        Thread {
+            val file = Updater.download(applicationContext, info)
+            runOnUiThread {
+                buttonUpdate.isEnabled = true
+                if (file != null) {
+                    textUpdate.text = "Nova versão disponível: ${info.versionName}"
+                    Updater.install(this, file)
+                } else {
+                    textUpdate.text = "Falha no download. Toque para tentar de novo."
+                }
+            }
+        }.start()
+    }
+
     override fun onResume() {
         super.onResume()
+        checkForUpdate()
         updateStatus()
         logHandler.post(logRefreshRunnable)
     }
