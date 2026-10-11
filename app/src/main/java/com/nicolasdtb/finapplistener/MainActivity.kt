@@ -14,6 +14,7 @@ import android.view.View
 import android.widget.Button
 import android.widget.CheckBox
 import android.widget.EditText
+import android.widget.Toast
 import android.widget.ScrollView
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
@@ -65,6 +66,9 @@ class MainActivity : AppCompatActivity() {
         findViewById<TextView>(R.id.textVersion).text =
             "Versão ${Updater.installedVersionName(this)}"
         buttonUpdate.setOnClickListener { downloadAndInstall() }
+        findViewById<Button>(R.id.buttonCheckUpdate).setOnClickListener {
+            checkForUpdate(manual = true)
+        }
 
         loadState()
         requestNotificationPermissionIfNeeded()
@@ -143,10 +147,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     /** Consulta o GitHub (no maximo a cada 10 min) e mostra o aviso se houver versao nova. */
-    private fun checkForUpdate() {
+    private fun checkForUpdate(manual: Boolean = false) {
         val now = System.currentTimeMillis()
-        if (now - lastUpdateCheck < 10 * 60 * 1000) return
+        if (!manual && now - lastUpdateCheck < 10 * 60 * 1000) return
         lastUpdateCheck = now
+        if (manual) Toast.makeText(this, "Buscando atualizações…", Toast.LENGTH_SHORT).show()
         Thread {
             val info = Updater.checkForUpdate(applicationContext)
             runOnUiThread {
@@ -156,6 +161,13 @@ class MainActivity : AppCompatActivity() {
                     updateBanner.visibility = View.VISIBLE
                 } else {
                     updateBanner.visibility = View.GONE
+                    if (manual) {
+                        Toast.makeText(
+                            this,
+                            "Nenhuma atualização encontrada (ou sem conexão).",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
                 }
             }
         }.start()
