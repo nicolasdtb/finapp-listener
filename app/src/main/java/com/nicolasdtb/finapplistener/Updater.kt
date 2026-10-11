@@ -1,10 +1,14 @@
 package com.nicolasdtb.finapplistener
 
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
+import androidx.core.app.NotificationCompat
 import androidx.core.content.FileProvider
 import org.json.JSONObject
 import java.io.File
@@ -21,6 +25,17 @@ data class UpdateInfo(val versionCode: Int, val versionName: String, val apkUrl:
  * baixamos o APK e abrimos o instalador do sistema (um toque de confirmacao).
  */
 object Updater {
+
+    private const val PREFS = "finapp_listener_prefs"
+    private const val KEY_LAST_CHECK = "update_last_check"
+    private const val KEY_LAST_NOTIFIED = "update_last_notified"
+    private const val CHECK_INTERVAL_MS = 12 * 60 * 60 * 1000L
+    private const val CHANNEL_ID = "finapp_listener_update"
+    const val NOTIFICATION_ID = 2
+
+    /** True se a ultima consulta ao GitHub chegou a uma resposta (mesmo "sem novidade"). */
+    @Volatile
+    var lastCheckSucceeded = false
 
     private const val LATEST_URL =
         "https://api.github.com/repos/nicolasdtb/finapp-listener/releases/latest"
@@ -39,6 +54,7 @@ object Updater {
 
     /** Retorna a versao nova, ou null se ja esta atualizado / sem rede. Rodar fora da thread principal. */
     fun checkForUpdate(ctx: Context): UpdateInfo? {
+        lastCheckSucceeded = false
         return try {
             val conn = (URL(LATEST_URL).openConnection() as HttpURLConnection).apply {
                 connectTimeout = 10_000
@@ -47,6 +63,7 @@ object Updater {
             }
             if (conn.responseCode != 200) return null
             val json = JSONObject(conn.inputStream.bufferedReader().use { it.readText() })
+            lastCheckSucceeded = true
             val tag = json.optString("tag_name").removePrefix("v")
             val code = tag.toIntOrNull() ?: return null
             if (code <= installedVersionCode(ctx)) return null
@@ -109,5 +126,53 @@ object Updater {
                 .setDataAndType(uri, "application/vnd.android.package-archive")
                 .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
         )
+    }
+
+    /**
+     * Chamado em segundo plano pelo servico de notificacoes (rodar fora da thread principal).
+     * Consulta o GitHub no maximo a cada 12h e, havendo versao nova ainda nao avisada,
+     * mostra uma notificacao que abre o app (onde fica o botao "Baixar e instalar").
+     */
+    fun checkAndNotify(ctx: Context) {
+        val prefs = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val now = System.currentTimeMillis()
+        if (now - prefs.getLong(KEY_LAST_CHECK, 0L) < CHECK_INTERVAL_MS) return
+
+        val info = checkForUpdate(ctx)
+        // So conta como "consultou" se houve resposta; sem rede, tenta de novo na proxima oportunidade.
+        if (!lastCheckSucceeded) return
+        prefs.edit().putLong(KEY_LAST_CHECK, now).apply()
+
+        val nm = ctx.getSystemService(NotificationManager::class.java) ?: return
+        if (info == null) {
+            nm.cancel(NOTIFICATION_ID)
+            return
+        }
+        if (prefs.getInt(KEY_LAST_NOTIFIED, 0) == info.versionCode) return // ja avisou desta versao
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            nm.createNotificationChannel(
+                NotificationChannel(CHANNEL_ID, "Atualizações do FinApp Listener", NotificationManager.IMPORTANCE_DEFAULT)
+            )
+        }
+        val open = PendingIntent.getActivity(
+            ctx, 0,
+            Intent(ctx, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+        val notification = NotificationCompat.Builder(ctx, CHANNEL_ID)
+            .setContentTitle("Nova versão do FinApp Listener")
+            .setContentText("Versão ${info.versionName} disponível. Toque para baixar e instalar.")
+            .setSmallIcon(android.R.drawable.stat_sys_download_done)
+            .setContentIntent(open)
+            .setAutoCancel(true)
+            .build()
+        try {
+            nm.notify(NOTIFICATION_ID, notification)
+            prefs.edit().putInt(KEY_LAST_NOTIFIED, info.versionCode).apply()
+            AppLog.add(ctx, "Nova versão ${info.versionName} disponível — notificação exibida")
+        } catch (e: SecurityException) {
+            AppLog.add(ctx, "Sem permissão para exibir a notificação de atualização")
+        }
     }
 }

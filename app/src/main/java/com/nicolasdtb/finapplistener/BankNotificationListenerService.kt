@@ -99,7 +99,10 @@ class BankNotificationListenerService : NotificationListenerService() {
         startForegroundWithStatusNotification()
 
         // Tenta drenar a fila assim que o serviço sobe (ex: reboot do celular).
-        executor.execute { QueueFlusher.flush(applicationContext) }
+        executor.execute {
+            QueueFlusher.flush(applicationContext)
+            Updater.checkAndNotify(applicationContext)
+        }
 
         registerNetworkCallback()
     }
@@ -189,6 +192,8 @@ class BankNotificationListenerService : NotificationListenerService() {
         val callback = object : ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: Network) {
                 AppLog.add(applicationContext, "Rede disponível (possível VPN conectando)")
+                // Aproveita a rede para ver se saiu versao nova (no maximo a cada 12h)
+                executor.execute { Updater.checkAndNotify(applicationContext) }
                 if (!PendingQueue.hasPending(applicationContext)) {
                     AppLog.add(applicationContext, "Nenhuma notificação pendente — nada a reenviar")
                     return

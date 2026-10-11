@@ -161,6 +161,11 @@ class MainActivity : AppCompatActivity() {
                     updateBanner.visibility = View.VISIBLE
                 } else {
                     updateBanner.visibility = View.GONE
+                    // Ja esta atualizado: tira o aviso de versao nova, se ainda estiver na barra
+                    if (Updater.lastCheckSucceeded) {
+                        getSystemService(android.app.NotificationManager::class.java)
+                            ?.cancel(Updater.NOTIFICATION_ID)
+                    }
                     if (manual) {
                         Toast.makeText(
                             this,
