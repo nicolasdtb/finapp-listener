@@ -1,6 +1,10 @@
 package com.nicolasdtb.finapplistener
 
 import android.Manifest
+import android.content.ClipboardManager
+import android.content.Context
+import android.content.res.ColorStateList
+import android.graphics.Color
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
@@ -12,10 +16,9 @@ import android.text.Editable
 import android.text.TextWatcher
 import android.view.View
 import android.widget.Button
-import android.widget.CheckBox
+import android.widget.CompoundButton
 import android.widget.EditText
 import android.widget.Toast
-import android.widget.ScrollView
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
@@ -27,13 +30,15 @@ class MainActivity : AppCompatActivity() {
     private val interPackage = "br.com.intermedium"
     private val bradescoPackage = "com.bradesco"
 
-    private lateinit var checkboxNubank: CheckBox
-    private lateinit var checkboxInter: CheckBox
-    private lateinit var checkboxBradesco: CheckBox
+    private lateinit var checkboxNubank: CompoundButton
+    private lateinit var checkboxInter: CompoundButton
+    private lateinit var checkboxBradesco: CompoundButton
     private lateinit var editWebhookToken: EditText
     private lateinit var textStatus: TextView
     private lateinit var textLog: TextView
-    private lateinit var scrollLog: ScrollView
+    private lateinit var statusDot: View
+    private lateinit var textQueue: TextView
+    private lateinit var buttonEnableListener: Button
     private lateinit var updateBanner: View
     private lateinit var textUpdate: TextView
     private lateinit var buttonUpdate: Button
@@ -59,7 +64,9 @@ class MainActivity : AppCompatActivity() {
         editWebhookToken = findViewById(R.id.editWebhookToken)
         textStatus = findViewById(R.id.textStatus)
         textLog = findViewById(R.id.textLog)
-        scrollLog = findViewById(R.id.scrollLog)
+        statusDot = findViewById(R.id.statusDot)
+        textQueue = findViewById(R.id.textQueue)
+        buttonEnableListener = findViewById(R.id.buttonEnableListener)
         updateBanner = findViewById(R.id.updateBanner)
         textUpdate = findViewById(R.id.textUpdate)
         buttonUpdate = findViewById(R.id.buttonUpdate)
@@ -92,7 +99,9 @@ class MainActivity : AppCompatActivity() {
             AppConfig.setAppEnabled(this, bradescoPackage, checked)
         }
 
-        findViewById<android.widget.Button>(R.id.buttonEnableListener).setOnClickListener {
+        findViewById<Button>(R.id.buttonPasteToken).setOnClickListener { pasteToken() }
+
+        buttonEnableListener.setOnClickListener {
             startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
         }
 
@@ -103,6 +112,18 @@ class MainActivity : AppCompatActivity() {
         findViewById<android.widget.Button>(R.id.buttonClearLog).setOnClickListener {
             AppLog.clear(this)
             refreshLog()
+        }
+    }
+
+    private fun pasteToken() {
+        val cm = getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+        val text = cm?.primaryClip?.takeIf { it.itemCount > 0 }
+            ?.getItemAt(0)?.coerceToText(this)?.toString()?.trim().orEmpty()
+        if (text.isEmpty()) {
+            Toast.makeText(this, "Área de transferência vazia.", Toast.LENGTH_SHORT).show()
+        } else {
+            editWebhookToken.setText(text)
+            Toast.makeText(this, "Token colado.", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -213,12 +234,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun refreshLog() {
-        val logText = AppLog.readAll(this)
-        // Só atualiza (e rola pro fim) se o conteúdo mudou, para não
-        // atrapalhar se o usuário estiver com o dedo rolando o scroll.
+        // Mostra so as ultimas linhas (a pagina inteira ja rola).
+        val logText = AppLog.readAll(this).lines().takeLast(25).joinToString("\n")
         if (textLog.text.toString() != logText) {
             textLog.text = logText
-            scrollLog.post { scrollLog.fullScroll(android.view.View.FOCUS_DOWN) }
         }
         updateStatus()
     }
@@ -237,19 +256,16 @@ class MainActivity : AppCompatActivity() {
         ).orEmpty()
 
         val granted = enabledListeners.contains(packageName)
-        val accessLine = if (granted) {
-            "Acesso a notificações concedido — o listener está ativo em segundo plano."
-        } else {
-            "Acesso a notificações NÃO concedido. Toque no botão acima e habilite " +
-                "\"FinApp Listener\" na lista."
-        }
+        textStatus.text = if (granted) "Ativo, monitorando" else "Acesso a notificações desligado"
+        statusDot.backgroundTintList = ColorStateList.valueOf(
+            Color.parseColor(if (granted) "#10B981" else "#F43F5E")
+        )
+        buttonEnableListener.visibility = if (granted) View.GONE else View.VISIBLE
 
-        val queueLine = if (PendingQueue.hasPending(this)) {
-            "\n\nHá notificações aguardando reenvio (sem conexão com o FinApp no momento)."
+        textQueue.text = if (PendingQueue.hasPending(this)) {
+            "Há notificações aguardando reenvio (sem conexão com o FinApp)."
         } else {
-            "\n\nNenhuma notificação pendente na fila."
+            "Nenhuma notificação pendente na fila."
         }
-
-        textStatus.text = accessLine + queueLine
     }
 }
